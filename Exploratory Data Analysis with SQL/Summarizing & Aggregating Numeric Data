@@ -1,0 +1,301 @@
+DIVISION
+-- Select average revenue per employee by sector
+SELECT sector, 
+       avg(revenues/employees::numeric) AS avg_rev_employee
+  FROM fortune500
+ GROUP BY sector
+ -- Use the alias to order the results
+ ORDER BY avg_rev_employee;
+ 
+EXPLORE WITH DIVISION
+-- Divide unanswered_count by question_count
+SELECT unanswered_count/question_count::numeric AS computed_pct, 
+       -- What are you comparing the above quantity to?
+       unanswered_pct
+  FROM stackoverflow
+ -- Select rows where question_count is not 0
+ WHERE question_count != 0
+ LIMIT 10;
+ 
+SUMMARIZE NUMERIC COLUMNS
+ -- Select min, avg, max, and stddev of fortune500 profits
+SELECT min(profits),
+       avg(profits),
+       max(profits),
+       stddev(profits)
+  FROM fortune500;
+  
+SUMMARIZE GROUP STATISTICS
+  -- Compute standard deviation of maximum values
+SELECT stddev(maxval),
+       -- min
+       min(maxval),
+       -- max
+       max(maxval),
+       -- avg
+       avg(maxval)
+  -- Subquery to compute max of question_count by tag
+  FROM (SELECT max(question_count) AS maxval
+          FROM stackoverflow
+         -- Compute max by...
+         GROUP BY tag) AS max_results; -- alias for subquery
+         
+TRUNCATE
+ -- Truncate employees
+SELECT trunc(employees, -5) AS employee_bin,
+       -- Count number of companies with each truncated value
+       count(*)
+  FROM fortune500
+ -- Use alias to group
+ GROUP BY employee_bin
+ -- Use alias to order
+ ORDER BY employee_bin;
+ 
+GENERATE SERIES
+-- Select the min and max of question_count
+SELECT min(question_count), 
+       max(question_count)
+  -- From what table?
+  FROM stackoverflow
+ -- For tag dropbox
+ WHERE tag='dropbox';
+ 
+CORRELATION
+ -- Correlation between revenues and profit
+SELECT corr(revenues, profits) AS rev_profits,
+	   -- Correlation between revenues and assets
+       corr(revenues, assets) AS rev_assets,
+       -- Correlation between revenues and equity
+       corr(revenues, equity) AS rev_equity 
+  FROM fortune500;
+  
+MEAN AND MEDIAN
+-- What groups are you computing statistics by?
+SELECT sector, 
+       -- Select the mean of assets with the avg function
+       avg(assets) AS mean,
+       -- Select the median
+       percentile_disc(0.5) WITHIN GROUP (ORDER BY assets) AS median
+  FROM fortune500
+ -- Computing statistics for each what?
+ GROUP BY sector
+ -- Order results by a value of interest
+ ORDER BY mean;
+ 
+CREATE A TEMP TABLE
+-- To clear table if it already exists;
+-- fill in name of temp table
+DROP TABLE IF EXISTS profit80;
+
+-- Create the temporary table
+CREATE TEMP TABLE profit80 AS
+  -- Select the two columns you need; alias as needed
+  SELECT sector, 
+         percentile_disc(0.8) WITHIN GROUP (ORDER BY profits) AS pct80
+    -- What table are you getting the data from?
+    FROM fortune500 
+   -- What do you need to group by?
+   GROUP BY sector;
+   
+-- See what you created: select all columns and rows 
+-- from the table you created
+SELECT * 
+  FROM profit80;
+  
+CREATE A TEMP TABLE TO SIMPLIFY A QUERY
+-- To clear table if it already exists
+DROP TABLE IF EXISTS startdates;
+
+-- Create temp table syntax
+CREATE TEMP TABLE startdates AS
+-- Compute the minimum date for each what?
+SELECT tag,
+       min(date) AS mindate
+  FROM stackoverflow
+ -- What do you need to compute the min date for each tag?
+ GROUP BY tag;
+ 
+ -- Look at the table you created
+ SELECT * 
+   FROM startdates;
+ 
+INSERT INTO A TEMP TABLE
+DROP TABLE IF EXISTS correlations;
+-- Create temp table 
+CREATE TEMP TABLE correlations AS
+-- Select each correlation
+SELECT 'profits'::varchar AS measure,
+       -- Compute correlations
+       corr(profits, profits) AS profits,
+       corr(profits, profits_change) AS profits_change,
+       corr(profits, revenues_change) AS revenues_change
+  FROM fortune500;
+  
+TRIM FUNCTION
+SELECT distinct street,
+       -- Trim off unwanted characters from street
+       trim(street, '0123456789 #/.') AS cleaned_street
+  FROM evanston311
+ ORDER BY street;
+ 
+ CONCATENATE AND TRIM STRINGS
+ -- Concatenate house_num, a space, and street
+-- and trim spaces from the start of the result
+SELECT ltrim(concat(house_num, ' ', street)) AS address
+  FROM evanston311;
+  
+SPLIT STRINGS ON A DELIMITER
+-- Select the first word of the street value
+SELECT split_part(street, ' ', 1) AS street_name, 
+       count(*)
+  FROM evanston311
+ GROUP BY street_name
+ ORDER BY count DESC
+ LIMIT 20;
+ 
+SHORTEN LONG STRINGS
+ -- Select the first 50 chars when length is greater than 50
+SELECT CASE WHEN length(description) > 50
+            THEN left(description, 50) || '...'
+       -- otherwise just select description
+       ELSE description
+       END
+  FROM evanston311
+ -- limit to descriptions that start with the word I
+ WHERE description LIKE 'I %'
+ ORDER BY description;
+ 
+ GROUP AND RECODE VALUES
+ -- Fill in the command below with the name of the temp table
+DROP TABLE IF EXISTS recode;
+-- Create and name the temporary table
+CREATE TEMP TABLE recode AS
+-- Write the select query to generate the table 
+-- with distinct values of category and standardized values
+  SELECT DISTINCT category, 
+         rtrim(split_part(category, '-', 1)) AS standardized
+    -- What table are you selecting the above values from?
+    FROM evanston311;
+-- Look at a few values before the next step
+SELECT DISTINCT standardized 
+  FROM recode
+ WHERE standardized LIKE 'Trash%Cart'
+    OR standardized LIKE 'Snow%Removal%';
+    
+CREATE A TABLE WITH INDICATOR VARIABLES
+ -- To clear table if it already exists
+DROP TABLE IF EXISTS indicators;
+-- Create the indicators temp table
+CREATE TEMP TABLE indicators AS
+  -- Select id
+  SELECT id, 
+         -- Create the email indicator (find @)
+         CAST (description LIKE '%@%' AS integer) AS email,
+         -- Create the phone indicator
+         CAST (description LIKE '%___-___-____%' AS integer) AS phone 
+    -- What table contains the data? 
+    FROM evanston311;
+-- Inspect the contents of the new temp table
+SELECT *
+  FROM indicators;
+  
+  
+COMPLETION TIME BY CATEGORY
+-- Select the category and the average completion time by category
+SELECT category, 
+       avg(date_completed - date_created) AS completion_time
+  FROM evanston311
+ GROUP BY category
+-- Order the results
+ ORDER BY completion_time DESC;
+ 
+VARIATION BY DAY OF WEEK
+-- Select name of the day of the week the request was created 
+SELECT to_char(date_created, 'day') AS day, 
+       -- Select avg time between request creation and completion
+       avg(date_completed - date_created) AS duration 
+  FROM evanston311 
+ -- Group by the name of the day of the week and 
+ -- integer value of day of week the request was created
+ GROUP BY day, EXTRACT(DOW FROM date_created) 
+ -- Order by integer value of the day of the week 
+ -- the request was created
+ ORDER BY EXTRACT(DOW FROM date_created);
+  
+DATE TRUNCATION
+-- Aggregate daily counts by month
+SELECT date_trunc('month', day) AS month,
+       avg(count)
+  -- Subquery to compute daily counts
+  FROM (SELECT date_trunc('day', date_created) AS day,
+               count(*) AS count
+          FROM evanston311
+         GROUP BY day) AS daily_count
+ GROUP BY month
+ ORDER BY month;
+ 
+ FIND MISSING DATES
+ SELECT day
+-- 1) Subquery to generate all dates
+-- from min to max date_created
+  FROM (SELECT generate_series(min(date_created),
+                               max(date_created),
+                               '1 day')::date AS day
+          -- What table is date_created in?
+          FROM evanston311) AS all_dates      
+-- 4) Select dates (day from above) that are NOT IN the subquery
+ WHERE day NOT IN 
+       -- 2) Subquery to select all date_created values as dates
+       (SELECT date_created::date
+          FROM evanston311);
+          
+CUSTOM AGGREGATION PERIODS
+-- Generate 6 month bins covering 2016-01-01 to 2018-06-30
+
+-- Create lower bounds of bins
+SELECT generate_series('2016-01-01',  -- First bin lower value
+                       '2018-01-01',  -- Last bin lower value
+                       '6 months'::interval) AS lower,
+-- Create upper bounds of bins
+       generate_series('2016-07-01',  -- First bin upper value
+                       '2018-07-01',  -- Last bin upper value
+                       '6 months'::interval) AS upper;
+                       
+ MONTHLY AVERAGE WITH MISSING DATES
+ -- generate series with all days from 2016-01-01 to 2018-06-30
+WITH all_days AS 
+     (SELECT generate_series('2016-01-01',
+                             '2018-06-30',
+                             '1 day'::interval) AS date),
+     -- Subquery to compute daily counts
+     daily_count AS 
+     (SELECT date_trunc('day', date_created) AS day,
+             count(*) AS count
+        FROM evanston311
+       GROUP BY day)
+-- Aggregate daily counts by month using date_trunc
+SELECT date_trunc('month', date) AS month,
+       -- Use coalesce to replace NULL count values with 0
+       avg(coalesce(count, 0)) AS average
+  FROM all_days
+       LEFT JOIN daily_count
+       -- Joining condition
+       ON all_days.date=daily_count.day
+ GROUP BY month
+ ORDER BY month; 
+ 
+ LONGEST GAP
+ -- Compute the gaps
+WITH request_gaps AS (
+        SELECT date_created,
+               -- lead or lag
+               lag(date_created) OVER (ORDER BY date_created) AS previous,
+               -- compute gap as date_created minus lead or lag
+               date_created - lag(date_created) OVER (ORDER BY date_created) AS gap
+          FROM evanston311)
+-- Select the row with the maximum gap
+SELECT *
+  FROM request_gaps
+-- Subquery to select maximum gap from request_gaps
+ WHERE gap = (SELECT max(gap) 
+                FROM request_gaps);
